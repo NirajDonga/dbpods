@@ -1,13 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
+	"github.com/NirajDonga/neonpg/internal/config"
 	"github.com/NirajDonga/neonpg/internal/handler"
 	"github.com/NirajDonga/neonpg/internal/k8s"
+	"github.com/NirajDonga/neonpg/internal/proxy"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -15,20 +18,30 @@ import (
 )
 
 func main() {
+	cfg := config.LoadConfig()
 	clientset, err := initKubernetesClient()
 	if err != nil {
 		log.Fatalf("Failed to initialize Kubernetes client: %v", err)
 	}
-
 	log.Println("Successfully connected to Kubernetes cluster!")
 
-	k8sProvisioner := k8s.NewProvisioner(clientset, "default")
+	k8sProvisioner := k8s.NewProvisioner(clientset, cfg.Namespace)
 	apiHandler := handler.NewAPIHandler(k8sProvisioner)
 
 	http.HandleFunc("/create-database", apiHandler.HandleCreateDB)
 
-	log.Println("Control Plane API running on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	tcpProxy := proxy.NewPostgresProxy(cfg.Namespace)
+	go func() {
+		// Standard Postgres port is 5432
+		if err := tcpProxy.Start("5432"); err != nil {
+			log.Fatalf("TCP Proxy crashed: %v", err)
+		}
+	}()
+
+	serverAddr := fmt.Sprintf(":%s", cfg.Port)
+	log.Printf("Control Plane API running on %s (Namespace: %s)", serverAddr, cfg.Namespace)
+
+	if err := http.ListenAndServe(serverAddr, nil); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

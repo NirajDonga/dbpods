@@ -68,7 +68,7 @@ func (k *K8sProvisioner) buildStatefulSet(tenantID, password, serviceName string
 		Ports: []corev1.ContainerPort{{ContainerPort: 5432}},
 		Env: []corev1.EnvVar{
 			{Name: "POSTGRES_PASSWORD", Value: password},
-			{Name: "POSTGRES_USER", Value: fmt.Sprintf("admin_%s", tenantID)},
+			{Name: "POSTGRES_USER", Value: tenantID},
 			{Name: "POSTGRES_DB", Value: fmt.Sprintf("%s_data", tenantID)},
 		},
 		VolumeMounts: []corev1.VolumeMount{
