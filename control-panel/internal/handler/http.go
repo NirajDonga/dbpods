@@ -1,14 +1,18 @@
 package handler
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/rand"
 	"net/http"
-	"time"
+	"regexp"
+	"strings"
 
 	"github.com/NirajDonga/dbpods/internal/core"
 )
+
+var validTenantID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*$`)
 
 type APIHandler struct {
 	provisioner core.DBProvisioner
@@ -34,10 +38,27 @@ func (h *APIHandler) HandleCreateDB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	dbPassword := fmt.Sprintf("secure_%d", rng.Intn(999999))
+	req.TenantID = strings.TrimSpace(req.TenantID)
+	if req.TenantID == "" {
+		http.Error(w, "tenantId is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.TenantID) > 63 {
+		http.Error(w, "tenantId must be 63 characters or fewer", http.StatusBadRequest)
+		return
+	}
+	if !validTenantID.MatchString(req.TenantID) {
+		http.Error(w, "tenantId may only contain letters, digits, hyphens, and underscores, and must start with a letter or digit", http.StatusBadRequest)
+		return
+	}
 
-	err := h.provisioner.CreateTenantDatabase(r.Context(), req.TenantID, dbPassword)
+	dbPassword, err := generateSecurePassword(16)
+	if err != nil {
+		http.Error(w, "Failed to generate password", http.StatusInternalServerError)
+		return
+	}
+
+	err = h.provisioner.CreateTenantDatabase(r.Context(), req.TenantID, dbPassword)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to provision DB: %v", err), http.StatusInternalServerError)
 		return
@@ -46,7 +67,17 @@ func (h *APIHandler) HandleCreateDB(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Database provisioning successfully started",
-		"tenant":  req.TenantID,
+		"message":  "Database provisioning successfully started",
+		"tenant":   req.TenantID,
+		"password": dbPassword,
 	})
+}
+
+func generateSecurePassword(length int) (string, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes)[:length], nil
 }
