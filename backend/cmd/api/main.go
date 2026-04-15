@@ -8,6 +8,7 @@ import (
 	"github.com/NirajDonga/dbpods/internal/config"
 	database "github.com/NirajDonga/dbpods/internal/db"
 	"github.com/NirajDonga/dbpods/internal/handlers"
+	"github.com/NirajDonga/dbpods/internal/middleware"
 	"github.com/NirajDonga/dbpods/internal/repository"
 	"github.com/gin-gonic/gin"
 )
@@ -25,19 +26,29 @@ func main() {
 
 	// Wire up repositories and handlers.
 	userRepo := repository.NewUserRepository(pool)
+	podRepo := repository.NewPodRepository(pool)
 
 	authHandler := handlers.NewAuthHandler(cfg, userRepo)
+	podHandler := handlers.NewPodHandler(podRepo)
 
 	r := gin.Default()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	
+
 	auth := r.Group("/auth")
 	{
 		auth.GET("/google", authHandler.GoogleLogin)
 		auth.GET("/google/callback", authHandler.GoogleCallback)
+	}
+
+	// Protected API routes
+	api := r.Group("/api")
+	api.Use(middleware.AuthRequired(cfg.JWTSecret))
+	{
+		api.POST("/pods", podHandler.CreatePod)
+		api.GET("/pods", podHandler.GetUserPods)
 	}
 
 	log.Printf("Server starting on :%s", cfg.Port)
