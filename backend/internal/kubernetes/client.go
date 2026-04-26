@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"fmt"
+	"log"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -89,6 +90,16 @@ func (c *Client) CreatePostgresDeployment(ctx context.Context, tenantID, passwor
 							Name:      "pgdata",
 							MountPath: "/var/lib/postgresql/data",
 						}},
+						Resources: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("200m"),
+								corev1.ResourceMemory: resource.MustParse("128Mi"),
+							},
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("50m"),
+								corev1.ResourceMemory: resource.MustParse("64Mi"),
+							},
+						},
 					}},
 				},
 			},
@@ -124,11 +135,18 @@ func (c *Client) DeletePostgresDeployment(ctx context.Context, tenantID string) 
 	err1 := c.clientset.AppsV1().StatefulSets(c.namespace).Delete(ctx, stsName, metav1.DeleteOptions{})
 	err2 := c.clientset.CoreV1().Services(c.namespace).Delete(ctx, svcName, metav1.DeleteOptions{})
 
+	// Also delete the PVC, otherwise disk space leaks forever
+	pvcName := "pgdata-" + stsName + "-0"
+	err3 := c.clientset.CoreV1().PersistentVolumeClaims(c.namespace).Delete(ctx, pvcName, metav1.DeleteOptions{})
+
 	if err1 != nil {
 		return fmt.Errorf("delete statefulset: %w", err1)
 	}
 	if err2 != nil {
 		return fmt.Errorf("delete service: %w", err2)
+	}
+	if err3 != nil {
+		log.Printf("[k8s] Warning: failed to delete pvc %s: %v", pvcName, err3)
 	}
 	return nil
 }
