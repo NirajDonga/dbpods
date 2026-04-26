@@ -16,6 +16,8 @@ type AppConfig struct {
 	GoogleCallbackURL  string
 	JWTSecret          string
 	KubeConfig         string
+	ProxyPublicHost    string
+	ProxyPublicPort    string
 }
 
 func LoadConfig() *AppConfig {
@@ -30,6 +32,8 @@ func LoadConfig() *AppConfig {
 		GoogleCallbackURL:  mustGetEnv("GOOGLE_CALLBACK_URL"),
 		JWTSecret:          mustGetEnv("JWT_SECRET"),
 		KubeConfig:         mustGetEnv("KUBECONFIG"),
+		ProxyPublicHost:    mustGetEnv("PROXY_PUBLIC_HOST"),
+		ProxyPublicPort:    mustGetEnv("PROXY_PUBLIC_PORT"),
 	}
 }
 

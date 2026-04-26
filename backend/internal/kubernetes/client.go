@@ -82,8 +82,8 @@ func (c *Client) CreatePostgresDeployment(ctx context.Context, tenantID, passwor
 						Ports: []corev1.ContainerPort{{ContainerPort: 5432}},
 						Env: []corev1.EnvVar{
 							{Name: "POSTGRES_PASSWORD", Value: password},
-							{Name: "POSTGRES_USER", Value: "postgres"},
-							{Name: "POSTGRES_DB", Value: "postgres"},
+							{Name: "POSTGRES_USER", Value: tenantID},
+							{Name: "POSTGRES_DB", Value: tenantID},
 						},
 						VolumeMounts: []corev1.VolumeMount{{
 							Name:      "pgdata",

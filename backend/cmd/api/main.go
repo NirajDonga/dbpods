@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("Failed to create Kubernetes client: %v", err)
 	}
 
-	podService := services.NewPodService(podRepo, k8sClient)
+	podService := services.NewPodService(cfg, podRepo, k8sClient)
 
 	// Start the background cleanup worker
 	cleanupWorker := worker.NewCleanupWorker(podRepo, k8sClient)

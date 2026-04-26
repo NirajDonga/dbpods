@@ -7,18 +7,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/NirajDonga/dbpods/internal/config"
 	"github.com/NirajDonga/dbpods/internal/kubernetes"
 	"github.com/NirajDonga/dbpods/internal/models"
 	"github.com/NirajDonga/dbpods/internal/repository"
 )
 
 type PodService struct {
-	podRepo *repository.PodRepository
+	cfg       *config.AppConfig
+	podRepo   *repository.PodRepository
 	k8sClient *kubernetes.Client
 }
 
-func NewPodService(podRepo *repository.PodRepository, k8sClient *kubernetes.Client) *PodService {
-	return &PodService{podRepo: podRepo, k8sClient: k8sClient}
+func NewPodService(cfg *config.AppConfig, podRepo *repository.PodRepository, k8sClient *kubernetes.Client) *PodService {
+	return &PodService{cfg: cfg, podRepo: podRepo, k8sClient: k8sClient}
 }
 
 func generateSecurePassword() (string, error) {
@@ -59,8 +61,8 @@ func (s *PodService) ProvisionDatabase(ctx context.Context, userID int) (*models
 		return nil, "", "", fmt.Errorf("k8s provisioning failed: %w", err)
 	}
 
-	// 3. Make the connection string (in-cluster DNS)
-	connectionString := fmt.Sprintf("postgres://postgres:%s@%s-svc:5432/postgres", dbPassword, tenantID)
+	// 3. Make the connection string (routing through external TCP Proxy)
+	connectionString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", tenantID, dbPassword, s.cfg.ProxyPublicHost, s.cfg.ProxyPublicPort, tenantID)
 
 	return pod, connectionString, dbPassword, nil
 }
